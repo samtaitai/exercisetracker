@@ -91,7 +91,12 @@ app.get('/api/users/', (req,res)=>{
         if(err || !data){
             res.send('error')
         }else{
-            res.send(data)
+            const rawResult = data;
+            const result = rawResult.map((r)=>({
+                username: r.username,
+                _id: r._id
+            }))
+            res.send(result)
 
         }
     })
@@ -118,7 +123,7 @@ app.get('/api/users/:id/logs', (req,res)=>{
             if(from || to){ //if either of from or to exists,
                 filter.date = dateObj // add property 'date' in filter object
             }
-            
+
             Exercise.find(filter).limit(limit).exec((err, data)=>{
                 if(err || !data){
                     res.json([])
