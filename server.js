@@ -33,7 +33,7 @@ let Exercise = mongoose.model('exercise', ExerciseSchema);
 
 // create user & return json
 app.post('/api/users', (req,res)=>{
-  console.log('req.body', req.body);
+  //console.log('req.body', req.body);
   const newUser = new User({
     username: req.body.username
   })
@@ -118,8 +118,8 @@ app.get('/api/users/:id/logs', (req,res)=>{
             if(from || to){ //if either of from or to exists,
                 filter.date = dateObj // add property 'date' in filter object
             }
-            let noNullLimit = limit ?? 500; //if we don't have 'limit', give us 500 ?? means unless?
-            Exercise.find(filter).limit(+noNullLimit).exec((err, data)=>{
+            
+            Exercise.find(filter).limit(limit).exec((err, data)=>{
                 if(err || !data){
                     res.json([])
                 }else{
