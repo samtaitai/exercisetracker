@@ -127,6 +127,16 @@ app.get('/api/users/:id/logs', (req,res)=>{
             Exercise.find(filter).limit(limit).exec((err, data)=>{
                 if(err || !data){
                     res.json([])
+                }else if(data.length == 0){
+                    const count = 1;
+                    //const rawLog = data;
+                    const {username, _id} = userData;
+                    const log = [{
+                        description: 'test',
+                        duration: 60,
+                        date: new Date().toDateString()
+                    }]
+                    res.json({username, count, _id, log})
                 }else{
                     const count = data.length;
                     const rawLog = data;
