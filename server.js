@@ -51,37 +51,71 @@ app.post('/api/users', (req,res)=>{
 })
 
 app.post('/api/users/:id/exercises', (req,res)=>{
-  //console.log('req.body', req.body);
+  console.log('req.body', req.body);
   const id = req.params.id;
   const {userId, description, duration, date} = req.body; //object destructuring assignment
 
-  User.findById(id, (err, userData)=>{
-      if(err || !userData){
-          res.send('Cound not find the user')
-      }else{
-          const newExercise = new Exercise({
-              userId: id,
-              description, // req.body.description
-              duration,
-              date: new Date(date) // formatting
+  if(req.body.date === ''){
+      console.log('here I am')
+      let event = Date.now()
+      let today = new Date(event)
+      const newExercise = new Exercise({
+          userId: id,
+          description, // req.body.description
+          duration,
+          date: today.toDateString() // formatting
+      })
+      User.findById(id, (err, userData)=>{
+          if(err || !userData){
+              res.send('Cound not find the user')
+          }else{
+              newExercise.save((err,data)=>{
+                  if(err || !data){
+                      res.send('There was an error saving this exercise')
+                  }else{
+                      const {description, duration, date} = data;
+                      console.log(data.date)
+                      res.json({
+                          username: userData.username,
+                          description, // description: description same result
+                          duration,
+                          date: date.toDateString(),
+                          _id: userData._id
+                      })
+                  }
+              }) //.save
+          } //else
+      }) //findById
+  }else{
+      const newExercise = new Exercise({
+          userId: id,
+          description, // req.body.description
+          duration,
+          date: new Date(date) // formatting
+      })
+      User.findById(id, (err, userData)=>{
+          if(err || !userData){
+              res.send('Cound not find the user')
+          }else{
+              newExercise.save((err,data)=>{
+                  if(err || !data){
+                      res.send('There was an error saving this exercise')
+                  }else{
+                      const {description, duration, date} = data;
+                      res.json({
+                          username: userData.username,
+                          description, // description: description same result
+                          duration,
+                          date: date.toDateString(),
+                          _id: userData._id
+                      })
+                  }
+              }) //.save
+          } //else
+      }) //findById
+  }
 
-          })
-          newExercise.save((err,data)=>{
-              if(err || !data){
-                  res.send('There was an error saving this exercise')
-              }else{
-                  const {description, duration, date} = data;
-                  res.json({
-                      username: userData.username,
-                      description, // description: description same result
-                      duration,
-                      date: date.toDateString(),
-                      _id: userData.id
-                  })
-              }
-          }) //.save
-      } //else
-  }) //findById
+
 
 }) //second post
 
