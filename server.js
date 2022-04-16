@@ -18,24 +18,24 @@ app.get('/', (req, res) => {
 
 // username model
 let ExerciseSchema = mongoose.Schema({
-    userId: {type: String},
-    description: {type: String},
-    duration: {type: Number},
+    description: {type: String, required: true},
+    duration: {type: Number, required: true},
     date: {type: Date}
     });
 
 let UserSchema = mongoose.Schema({
-    username: {type: String}
+    username: {type: String},
+    log: [ExerciseSchema]
     });
 
-let User = mongoose.model('user', UserSchema);
-let Exercise = mongoose.model('exercise', ExerciseSchema);
+let Member = mongoose.model('member', UserSchema);
+let Session = mongoose.model('session', ExerciseSchema);
 
 // create user & return json
 app.post('/api/users', (req,res)=>{
   //console.log('req.body', req.body);
-  const newUser = new User({
-    username: req.body.username
+  const newUser = new Member({
+    username: req.body.username //don't worry about log for now
   })
   newUser.save((err,data)=>{
     if(err || !data){
@@ -53,75 +53,43 @@ app.post('/api/users', (req,res)=>{
 app.post('/api/users/:id/exercises', (req,res)=>{
   console.log('req.body', req.body);
   const id = req.params.id;
-  const {userId, description, duration, date} = req.body; //object destructuring assignment
+  const {_id, description, duration, date} = req.body; //object destructuring assignment
+  const newExercise = new Session({
+      description, // req.body.description
+      duration,
+      date
+  })
 
   if(req.body.date === ''){
       console.log('here I am')
-      let event = Date.now()
-      let today = new Date(event)
-      const newExercise = new Exercise({
-          userId: id,
-          description, // req.body.description
-          duration,
-          date: today.toDateString() // formatting
-      })
-      User.findById(id, (err, userData)=>{
-          if(err || !userData){
-              res.send('Cound not find the user')
-          }else{
-              newExercise.save((err,data)=>{
-                  if(err || !data){
-                      res.send('There was an error saving this exercise')
-                  }else{
-                      const {description, duration, date} = data;
-                      console.log(data.date)
-                      res.json({
-                          username: userData.username,
-                          description, // description: description same result
-                          duration,
-                          date: date.toDateString(),
-                          _id: userData._id
-                      })
-                  }
-              }) //.save
-          } //else
-      }) //findById
-  }else{
-      const newExercise = new Exercise({
-          userId: id,
-          description, // req.body.description
-          duration,
-          date: new Date(date) // formatting
-      })
-      User.findById(id, (err, userData)=>{
-          if(err || !userData){
-              res.send('Cound not find the user')
-          }else{
-              newExercise.save((err,data)=>{
-                  if(err || !data){
-                      res.send('There was an error saving this exercise')
-                  }else{
-                      const {description, duration, date} = data;
-                      res.json({
-                          username: userData.username,
-                          description, // description: description same result
-                          duration,
-                          date: date.toDateString(),
-                          _id: userData._id
-                      })
-                  }
-              }) //.save
-          } //else
-      }) //findById
+      newExercise.date = new Date()
+
   }
-
-
+  Member.findByIdAndUpdate(
+      id,
+      {$push : {log: newExercise}},
+      {new: true},
+      (err, userData)=>{
+      if(err || !userData){
+          res.send('Cound not find the user')
+      }else{
+          let responseObject = {}
+          responseObject = {
+              _id: userData._id,
+              username: userData.username,
+              date: new Date(newExercise.date).toDateString(),
+              duration: newExercise.duration,
+              description: newExercise.description // description: description same result
+              }
+          res.json(responseObject)
+      } //else
+  }) //findByIdAndUpdate
 
 }) //second post
 
 app.get('/api/users/', (req,res)=>{
 
-    User.find({}, (err, data)=>{
+    Member.find({}, (err, data)=>{
         if(err || !data){
             res.send('error')
         }else{
@@ -138,51 +106,59 @@ app.get('/api/users/', (req,res)=>{
 
 
 app.get('/api/users/:id/logs', (req,res)=>{
-    const {from, to, limit} = req.query;
-    const {id} = req.params;
-    User.findById(id, (err, userData)=>{
+
+    let limit = req.query.limit
+
+    //without from or to
+    Member.findById(req.params.id, (err, userData)=>{
         if(err || !userData){
             res.send('Could not find user')
-        }else{
-            let dateObj = {};
-            if(from){ // if req.query.from exists,
-                dateObj['$gte'] = new Date(from) // filter obj {_id: id, date: {$gte: from, $lte: to}}
+        }else if(userData["log"].length == 0){
+            let resObj = {
+                username: userData.username,
+                count: 1,
+                _id: userData._id,
+                log: [{
+                    description: "test",
+                    duration: 60,
+                    date: new Date("1990-01-01").toDateString()
+                }]
             }
-            if(to){
-                dateObj['$lte'] = new Date(to)
-            }
-            let filter = {
-                userId: id
-            };
-            if(from || to){ //if either of from or to exists,
-                filter.date = dateObj // add property 'date' in filter object
+            res.json(resObj)
+        }else{ // data ok, data has length
+            if(req.query.from || req.query.to){ // query
+                let fromDate = new Date(0)
+                let toDate = new Date()
+
+                if(req.query.from){
+                    fromDate = new Date(req.query.from)
+                }
+                if(req.query.to){
+                    toDate = new Date(req.query.to)
+                }
+
+                from = fromDate.getTime()
+                to = toDate.getTime()
+                console.log(from)
+                console.log(to)
+                userData.log = userData.log.filter((x)=>{
+                    let epochTime = x.date.getTime()
+
+                    return epochTime >= from && epochTime <= to
+                }).slice(0, limit)
             }
 
-            Exercise.find(filter).limit(limit).exec((err, data)=>{
-                if(err || !data){
-                    res.json([])
-                }else if(data.length == 0){
-                    const count = 1;
-                    //const rawLog = data;
-                    const {username, _id} = userData;
-                    const log = [{
-                        description: 'test',
-                        duration: 60,
-                        date: new Date().toDateString()
-                    }]
-                    res.json({username, count, _id, log})
-                }else{
-                    const count = data.length;
-                    const rawLog = data;
-                    const {username, _id} = userData;
-                    const log = rawLog.map((l)=>({ //(l) => ()
-                        description: l.description,
-                        duration: l.duration,
-                        date: l.date.toDateString()
-                    }))
-                    res.json({username, count, _id, log})
-                    }
-                })//find
+            let resObj = {
+                username:userData.username,
+                count:userData.log.length,
+                _id: userData._id,
+                log: userData.log.map((x)=>({
+                    description: x.description,
+                    duration: x.duration,
+                    date: new Date(x.date).toDateString()
+                })).slice(0, limit)
+            }
+            res.json(resObj)
             } //else
         })
     })
